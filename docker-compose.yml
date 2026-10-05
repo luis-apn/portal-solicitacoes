@@ -1,0 +1,45 @@
+# Sobe banco + backend + frontend com um comando: docker compose up --build
+# Acesse http://localhost:5173 (usuários de teste no README).
+
+services:
+  db:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_0900_ai_ci
+    ports:
+      - "3307:3306" # 3307 no computador para não conflitar com um MySQL local na 3306
+    volumes:
+      # Scripts executados automaticamente na PRIMEIRA vez que o banco é criado
+      - ./databases/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
+      - ./databases/seed.sql:/docker-entrypoint-initdb.d/02-seed.sql
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-proot"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  backend:
+    build: ./backend
+    environment:
+      SECRET_KEY: chave-de-demonstracao-troque-em-producao
+      DATABASE_URL: mysql+pymysql://root:root@db:3306/portal?charset=utf8mb4
+      TZ: America/Fortaleza
+    ports:
+      - "5001:5001"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  frontend:
+    build: ./frontend
+    environment:
+      API_URL: http://backend:5001
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend
+
+volumes:
+  mysql_data:
